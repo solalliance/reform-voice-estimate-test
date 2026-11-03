@@ -1,0 +1,6 @@
+import {catalog} from './public/estimate.mjs';
+export function sessionConfig(model='gpt-realtime-2.1') {
+return {type:'realtime',model,output_modalities:['audio'],audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'ja'},turn_detection:{type:'server_vad',create_response:true,interrupt_response:true}},output:{voice:'marin'}},
+instructions:`日本語で話すリフォーム会社の見積受付担当。自然で短い対話をする。最初に「どちらの現場で、どんな工事をご希望ですか」と一つだけ尋ねる。現場名、工事項目、数量、施工条件を整理し、不足だけ一つずつ聞く。入力が苦手な職人にも分かる平易な言葉を使う。途中の訂正を反映する。聞き取れない時は推測しない。確定していない寸法や数量はnullとして残す。「明日確認」等は保留として記録し、繰り返し聞かない。\n以下はテスト専用の架空の税別単価表。実際の相場ではない：${JSON.stringify(catalog)}\n単価表外の工事は金額を作らずpendingに要確認として書く。金額を自分で計算しない。内容がまとまった時や訂正された時はupdate_estimateを呼び、返ってきた計算結果を使って短く説明する。未確定の項目があれば合計は確定分のみと説明。最後に読み上げて内容の確認を取る。このテストは正式発注・見積送付・業務登録を行わない。「保存した」「送付した」と言わず画面の下書きを更新したと伝える。関係ない話題は見積受付へ戻す。`,
+tools:[{type:'function',name:'update_estimate',description:'画面の見積下書きを更新し単価表で再計算。呼び出しごとに全項目を送る。',parameters:{type:'object',properties:{site:{type:'string'},items:{type:'array',items:{type:'object',properties:{id:{type:'string',enum:catalog.map(c=>c.id)},quantity:{type:['number','null']}},required:['id','quantity'],additionalProperties:false}},pending:{type:'array',items:{type:'string'}}},required:['site','items','pending'],additionalProperties:false}}],tool_choice:'auto'};
+}

@@ -11,6 +11,12 @@ http.createServer(async(req,res)=>{
   const origin=req.headers.origin;
   if(origin && origin!==allowed && origin!==`http://localhost:${port}` && origin!==`http://127.0.0.1:${port}`){res.writeHead(403).end('接続元が許可されていません');return;}
   if(origin){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');}
+  if(req.method==='GET'&&req.url==='/local-config'){
+    const local=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    const localHost=[`localhost:${port}`,`127.0.0.1:${port}`].includes(req.headers.host);
+    if(!local||!localHost||(origin&&origin!==`http://${req.headers.host}`)){res.writeHead(403).end('Local access only');return;}
+    res.setHeader('Content-Type','application/json');res.end(JSON.stringify({accessCode:process.env.DEMO_ACCESS_CODE||''}));return;
+  }
   if(req.method==='OPTIONS'){res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');res.writeHead(204).end();return;}
   if(req.method==='POST'&&req.url==='/session'){
     const key=process.env.OPENAI_API_KEY,code=process.env.DEMO_ACCESS_CODE;

@@ -3,18 +3,18 @@ import {readFile} from 'node:fs/promises';
 import {timingSafeEqual} from 'node:crypto';
 import {sessionConfig} from './session.mjs';
 const port=Number(process.env.PORT||8787);
-const allowed=process.env.ALLOWED_ORIGIN||'https://solalliance.github.io';
+const allowed=(process.env.ALLOWED_ORIGIN||'https://solalliance.github.io').split(',').map(x=>x.trim());
 const files={'/':['index.html','text/html; charset=utf-8'],'/app.mjs':['app.mjs','text/javascript'],'/estimate.mjs':['estimate.mjs','text/javascript'],'/style.css':['style.css','text/css']};
 const hits=new Map();
 http.createServer(async(req,res)=>{
   res.setHeader('Cache-Control','no-store');
   const origin=req.headers.origin;
-  if(origin && origin!==allowed && origin!==`http://localhost:${port}` && origin!==`http://127.0.0.1:${port}`){res.writeHead(403).end('接続元が許可されていません');return;}
+  if(origin && !allowed.includes(origin) && origin!==`http://localhost:${port}` && origin!==`http://127.0.0.1:${port}`){res.writeHead(403).end('接続元が許可されていません');return;}
   if(origin){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');}
   if(req.method==='GET'&&req.url==='/local-config'){
     const local=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
     const localHost=[`localhost:${port}`,`127.0.0.1:${port}`].includes(req.headers.host);
-    if(!local||!localHost||(origin&&origin!==`http://${req.headers.host}`)){res.writeHead(403).end('Local access only');return;}
+    if(!local||!localHost||req.headers['cf-ray']||req.headers['x-forwarded-for']||(origin&&origin!==`http://${req.headers.host}`)){res.writeHead(403).end('Local access only');return;}
     res.setHeader('Content-Type','application/json');res.end(JSON.stringify({accessCode:process.env.DEMO_ACCESS_CODE||''}));return;
   }
   if(req.method==='OPTIONS'){res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');res.writeHead(204).end();return;}

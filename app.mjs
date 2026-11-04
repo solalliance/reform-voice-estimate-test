@@ -10,7 +10,12 @@ if(['localhost','127.0.0.1'].includes(location.hostname)){
  $('endpoint').value=`${location.origin}/session`;
  try{const r=await fetch('/local-config');if(r.ok){const config=await r.json();$('access').value=config.accessCode||'';$('hint').textContent='「会話を始める」を押して、マイクの利用を許可してください。';}}catch{}
 }
-else $('settings').open=true;
+else {
+ $('settings').open=true;
+ if(location.hostname.endsWith('.trycloudflare.com'))$('endpoint').value=`${location.origin}/session`;
+ const access=new URLSearchParams(location.hash.slice(1)).get('access');
+ if(access){$('access').value=access;history.replaceState(null,'',location.pathname+location.search);$('settings').open=false;$('hint').textContent='「会話を始める」を押して、マイクの利用を許可してください。';}
+}
 function stop(){sequence++;clearTimeout(timeout);clearInterval(ticker);stream?.getTracks().forEach(t=>t.stop());channel?.close();pc?.close();$('audio').srcObject=null;pc=channel=stream=null;connecting=false;document.body.classList.remove('connected');$('start').disabled=false;for(const id of ['stop','mute','message','send'])$(id).disabled=true;$('mute').textContent='マイクをミュート';status('未接続');$('hint').textContent='終了しました。下書きは画面に残っています。';}
 async function start(){
  if(connecting||pc)return;connecting=true;const thisSession=++sequence;$('start').disabled=true;$('stop').disabled=false;status('接続中');

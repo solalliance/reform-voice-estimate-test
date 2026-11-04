@@ -2,10 +2,12 @@ import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {timingSafeEqual} from 'node:crypto';
 import {sessionConfig} from './session.mjs';
+import {reportRoute} from './reports.mjs';
 const port=Number(process.env.PORT||8787);
 const allowed=(process.env.ALLOWED_ORIGIN||'https://solalliance.github.io').split(',').map(x=>x.trim());
 const files={'/':['index.html','text/html; charset=utf-8'],'/app.mjs':['app.mjs','text/javascript'],'/estimate.mjs':['estimate.mjs','text/javascript'],'/style.css':['style.css','text/css']};
 const hits=new Map();
+Object.assign(files,{'/report.html':['report.html','text/html; charset=utf-8'],'/report-admin.html':['report-admin.html','text/html; charset=utf-8'],'/report.mjs':['report.mjs','text/javascript'],'/connection.mjs':['connection.mjs','text/javascript']});
 http.createServer(async(req,res)=>{
   res.setHeader('Cache-Control','no-store');
   const origin=req.headers.origin;
@@ -17,14 +19,17 @@ http.createServer(async(req,res)=>{
     if(!local||!localHost||req.headers['cf-ray']||req.headers['x-forwarded-for']||(origin&&origin!==`http://${req.headers.host}`)){res.writeHead(403).end('Local access only');return;}
     res.setHeader('Content-Type','application/json');res.end(JSON.stringify({accessCode:process.env.DEMO_ACCESS_CODE||''}));return;
   }
-  if(req.method==='OPTIONS'){res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');res.writeHead(204).end();return;}
-  if(req.method==='POST'&&req.url==='/session'){
+  if(req.method==='OPTIONS'){res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');res.writeHead(204).end();return;}
+  const isReport=new URL(req.url,'http://localhost').pathname==='/reports';
+  if((req.method==='POST'&&req.url==='/session')||isReport){
     const key=process.env.OPENAI_API_KEY,code=process.env.DEMO_ACCESS_CODE;
     if(!key||!code){res.writeHead(503).end('サーバーのAPIキー・接続コードが未設定です');return;}
     const actual=Buffer.from(req.headers.authorization||''),expected=Buffer.from(`Bearer ${code}`);
     if(actual.length!==expected.length||!timingSafeEqual(actual,expected)){res.writeHead(401).end('接続コードを確認してください');return;}
+    if(isReport&&req.method==='GET'){await reportRoute(req,res);return;}
     const bucket=Math.floor(Date.now()/60000); if(!hits.has(bucket)){hits.clear();hits.set(bucket,0);}hits.set(bucket,hits.get(bucket)+1);
     if(hits.get(bucket)>6){res.writeHead(429).end('少し待ってから接続してください');return;}
+    if(isReport){await reportRoute(req,res);return;}
     try{
       let body='';for await(const chunk of req){body+=chunk;if(body.length>65536){res.writeHead(413).end('データが大きすぎます');return;}}
       if(!body.startsWith('v=0')){res.writeHead(400).end('音声接続データが不正です');return;}
